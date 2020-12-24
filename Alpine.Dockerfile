@@ -47,4 +47,3 @@ RUN rm -rf prometheus-${PROMETHEUS_VERSION}.linux-386* alertmanager-${ALERTMANAG
 ADD asset/entrypoint.sh .
 ENTRYPOINT ["sh", "entrypoint.sh"]
 
-
