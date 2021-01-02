@@ -1,0 +1,5 @@
+example/prometheus_storage/*
+!example/prometheus_storage/.gitkeep
+example/alertmanager_storage/*
+!example/alertmanager_storage/.gitkeep
+
