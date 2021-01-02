@@ -1,0 +1,22 @@
+version: "3.7"
+services:
+  server:
+    image: chouhongming/prometheus
+    ports:
+      - "9090:9090/udp"
+      - "9093:9093/udp"
+      - "9091:9091/udp"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - ./prometheus_storage:/prometheus
+      - ./alertmanager_storage:/alertmanager
+    environment:
+      - PROMETHEUS=true
+      - ALERTMANAGER=true
+      - PUSHGATEWAY=true
+      - TIMEZONE=UTC
+      - PROMETHEUS_OPT=
+      - ALERTMANAGER_OPT=
+      - PUSHGATEWAY_OPT=
+
