@@ -44,7 +44,9 @@ elif [ $ALERTMANAGER == "true" ]; then
     /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml \
         --storage.path=/alertmanager \
         $ALERTMANAGER_OPT
+elif [ $PUSHGATEWAY == "true" ]; then
+    /bin/pushgateway $PUSHGATEWAY_OPT
 else
-    /bin/pushgateway $PUSHGATEWAY_OPT 
+    echo "Nothing is enabled. Exit..."
 fi
 
