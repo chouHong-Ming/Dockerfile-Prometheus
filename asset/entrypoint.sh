@@ -19,6 +19,11 @@ if [ ! -f /etc/alertmanager/alertmanager.yml ]; then
     ALERTMANAGER="false"
 fi
 
+if [ -f /prometheus-rule/*.yml ]; then
+    echo "[Info] Found the Prometheus rule file. Copy to /etc/prometheus..."
+    cp /prometheus-rule/*.yml /etc/prometheus/.
+fi
+
 
 ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
 
