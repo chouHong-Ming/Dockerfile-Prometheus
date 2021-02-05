@@ -43,6 +43,8 @@ RUN cp pushgateway-${PUSHGATEWAY_VERSION}.linux-386/pushgateway /bin/pushgateway
 RUN rm -rf prometheus-${PROMETHEUS_VERSION}.linux-386* alertmanager-${ALERTMANAGER_VERSION}.linux-386* pushgateway-${PUSHGATEWAY_VERSION}.linux-386* && \
     apk del wget
 
+RUN mkdir -p /prometheus-rule
+
 
 ADD asset/entrypoint.sh .
 ENTRYPOINT ["sh", "entrypoint.sh"]
