@@ -11,6 +11,7 @@ services:
       - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
       - ./prometheus_storage:/prometheus
       - ./alertmanager_storage:/alertmanager
+      - ./prometheus-rule:/prometheus-rule
     environment:
       - PROMETHEUS=true
       - ALERTMANAGER=true

@@ -1,0 +1,12 @@
+groups:
+- name: instance-health
+  rules:
+  - alert: InstanceDown
+    expr: up == 0
+    for: 30s
+    labels:
+      issue: instance
+    annotations:
+      summary: "Instance {{ $labels.instance }} down"
+      description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 30 seconds."
+
