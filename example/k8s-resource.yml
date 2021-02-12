@@ -9,7 +9,7 @@ spec:
     storage: 400Gi
   nfs:
     path: /Prometheus/
-    server: 10.0.0.11
+    server: [YOUR_NFS_SERVER]
   persistentVolumeReclaimPolicy: Retain
   volumeMode: Filesystem
 
@@ -68,7 +68,7 @@ data:
   
 
     scrape_configs:
-    - job_name: 'gcp-gbro-kubernetes-apiservers'
+    - job_name: 'kubernetes-apiservers'
       kubernetes_sd_configs:
       - role: endpoints
       scheme: https
@@ -81,7 +81,7 @@ data:
         action: keep
         regex: default;kubernetes;https
 
-    - job_name: 'gcp-gbro-kubernetes-cadvisor'
+    - job_name: 'kubernetes-cadvisor'
       scheme: https
       metrics_path: /metrics/cadvisor
       tls_config:
@@ -94,7 +94,7 @@ data:
       - action: labelmap
         regex: __meta_kubernetes_node_label_(.+)
 
-    - job_name: 'gcp-gbro-kubernetes-kubelet'
+    - job_name: 'kubernetes-kubelet'
       scheme: https
       tls_config:
         ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
@@ -112,7 +112,7 @@ data:
         target_label: __metrics_path__
         replacement: /api/v1/nodes/${1}/proxy/metrics
 
-    - job_name: 'gcp-gbro-kubernetes-nodes'
+    - job_name: 'kubernetes-nodes'
       scheme: https
       tls_config:
         ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
@@ -124,7 +124,7 @@ data:
       - action: labelmap
         regex: __meta_kubernetes_node_label_(.+)
 
-    - job_name: 'gcp-gbro-kubernetes-ingresses'
+    - job_name: 'kubernetes-ingresses'
       metrics_path: /probe
       params:
         module: [http_2xx]
@@ -146,7 +146,7 @@ data:
       - source_labels: [__meta_kubernetes_ingress_name]
         target_label: kubernetes_name
 
-    - job_name: 'gcp-gbro-kubernetes-services'
+    - job_name: 'kubernetes-services'
       metrics_path: /probe
       params:
         module: [http_2xx]
@@ -166,7 +166,7 @@ data:
       - source_labels: [__meta_kubernetes_service_name]
         target_label: kubernetes_name
 
-    - job_name: 'gcp-gbro-kubernetes-service-endpoints'
+    - job_name: 'kubernetes-service-endpoints'
       kubernetes_sd_configs:
       - role: endpoints
       relabel_configs:
@@ -191,7 +191,7 @@ data:
         action: replace
         target_label: kubernetes_name
 
-    - job_name: 'gcp-gbro-kubernetes-pods'
+    - job_name: 'kubernetes-pods'
       kubernetes_sd_configs:
       - role: pod
       relabel_configs:
@@ -216,7 +216,7 @@ data:
         action: replace
         target_label: kubernetes_pod_name
 
-    - job_name: 'gcp-kubernetes-instance'
+    - job_name: 'node-exporter'
       static_configs:
       - targets: ['[YOUR_K8S_HOST_IP]:9100','[YOUR_K8S_HOST_IP]:9100','[YOUR_K8S_HOST_IP]:9100','[YOUR_K8S_HOST_IP]:9100']
 
@@ -240,7 +240,6 @@ data:
       slack_configs:
       - send_resolved: true
         channel: '[YOUR_K8S_CHANNEL]'
-
 
 kind: ConfigMap
 metadata:
@@ -319,7 +318,6 @@ spec:
       creationTimestamp: null
       labels:
         app: prometheus
-        manualrestart: 20210210-1641
     spec:
       serviceAccountName: prometheus
       serviceAccount: prometheus
