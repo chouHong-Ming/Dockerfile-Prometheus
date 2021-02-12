@@ -1,0 +1,485 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: prometheus
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 400Gi
+  nfs:
+    path: /Prometheus/
+    server: 10.0.0.11
+  persistentVolumeReclaimPolicy: Retain
+  volumeMode: Filesystem
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus
+  namespace: [YOUR_K8S_NAMESPACE]
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 400Gi
+  storageClassName: ""
+  volumeMode: Filesystem
+  volumeName: prometheus
+
+---
+apiVersion: v1
+data:
+  instance-alert.yml: |
+    groups:
+    - name: instance-health
+      rules:
+      - alert: InstanceDown
+        expr: up == 0
+        for: 30s
+        labels:
+          issue: instance
+        annotations:
+          summary: "Instance {{ $labels.instance }} down"
+          description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 30 seconds."
+kind: ConfigMap
+metadata:
+  labels:
+    app: prometheus
+  name: prometheus-rule
+  namespace: [YOUR_K8S_NAMESPACE]
+
+---
+apiVersion: v1
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval:     10s
+      evaluation_interval: 10s
+
+
+    alerting:
+      alertmanagers:
+      - static_configs:
+        - targets:
+          - 127.0.0.1:9093
+  
+
+    scrape_configs:
+    - job_name: 'gcp-gbro-kubernetes-apiservers'
+      kubernetes_sd_configs:
+      - role: endpoints
+      scheme: https
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        insecure_skip_verify: true
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: default;kubernetes;https
+
+    - job_name: 'gcp-gbro-kubernetes-cadvisor'
+      scheme: https
+      metrics_path: /metrics/cadvisor
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        insecure_skip_verify: true
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      kubernetes_sd_configs:
+      - role: node
+      relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+
+    - job_name: 'gcp-gbro-kubernetes-kubelet'
+      scheme: https
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        insecure_skip_verify: true
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      kubernetes_sd_configs:
+      - role: node
+      relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: kubernetes.default.svc:443
+      - source_labels: [__meta_kubernetes_node_name]
+        regex: (.+)
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/${1}/proxy/metrics
+
+    - job_name: 'gcp-gbro-kubernetes-nodes'
+      scheme: https
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        insecure_skip_verify: true
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      kubernetes_sd_configs:
+      - role: node
+      relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+
+    - job_name: 'gcp-gbro-kubernetes-ingresses'
+      metrics_path: /probe
+      params:
+        module: [http_2xx]
+      kubernetes_sd_configs:
+      - role: ingress
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_ingress_scheme,__address__,__meta_kubernetes_ingress_path]
+        regex: (.+);(.+);(.+)
+        replacement: ${1}://${2}${3}
+        target_label: __param_target
+      - target_label: __address__
+        replacement: blackbox-exporter.[YOUR_K8S_NAMESPACE].svc.cluster.[YOUR_K8S_DOMAIN]:9115
+      - source_labels: [__param_target]
+        target_label: instance
+      - action: labelmap
+        regex: __meta_kubernetes_ingress_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_ingress_name]
+        target_label: kubernetes_name
+
+    - job_name: 'gcp-gbro-kubernetes-services'
+      metrics_path: /probe
+      params:
+        module: [http_2xx]
+      kubernetes_sd_configs:
+      - role: service
+      relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - target_label: __address__
+        replacement: blackbox-exporter.[YOUR_K8S_NAMESPACE].svc.cluster.[YOUR_K8S_DOMAIN]:9115
+      - source_labels: [__param_target]
+        target_label: instance
+      - action: labelmap
+        regex: __meta_kubernetes_service_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_service_name]
+        target_label: kubernetes_name
+
+    - job_name: 'gcp-gbro-kubernetes-service-endpoints'
+      kubernetes_sd_configs:
+      - role: endpoints
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - action: labelmap
+        regex: __meta_kubernetes_service_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: kubernetes_name
+
+    - job_name: 'gcp-gbro-kubernetes-pods'
+      kubernetes_sd_configs:
+      - role: pod
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: kubernetes_pod_name
+
+    - job_name: 'gcp-kubernetes-instance'
+      static_configs:
+      - targets: ['[YOUR_K8S_HOST_IP]:9100','[YOUR_K8S_HOST_IP]:9100','[YOUR_K8S_HOST_IP]:9100','[YOUR_K8S_HOST_IP]:9100']
+
+  alertmanager.yml: |
+    global:
+      slack_api_url: ""
+
+
+    route:
+      receiver: 'Slack'
+      repeat_interval: 30m
+      routes:
+      - receiver: 'Slack'
+        group_wait: 10s
+        match:
+          issue: instance
+
+
+    receivers:
+    - name: Slack
+      slack_configs:
+      - send_resolved: true
+        channel: '[YOUR_K8S_CHANNEL]'
+
+
+kind: ConfigMap
+metadata:
+  labels:
+    app: prometheus
+  name: prometheus
+  namespace: [YOUR_K8S_NAMESPACE]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+- apiGroups: [""]
+  resources:
+  - nodes
+  - nodes/proxy
+  - nodes/metrics
+  - services
+  - endpoints
+  - pods
+  verbs: ["get", "list", "watch"]
+- apiGroups:
+  - extensions
+  - networking.k8s.io
+  resources:
+  - ingresses
+  verbs: ["get", "list", "watch"]
+- nonResourceURLs: ["/metrics", "/metrics/cadvisor"]
+  verbs: ["get"]
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: [YOUR_K8S_NAMESPACE]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+- kind: ServiceAccount
+  name: prometheus
+  namespace: [YOUR_K8S_NAMESPACE]
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: prometheus
+  name: prometheus
+  namespace: [YOUR_K8S_NAMESPACE]
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: prometheus
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: prometheus
+        manualrestart: 20210210-1641
+    spec:
+      serviceAccountName: prometheus
+      serviceAccount: prometheus
+      containers:
+      - image: chouhongming/prometheus
+        imagePullPolicy: Always
+        name: prometheus
+        env:
+        - name: PROMETHEUS
+          value: "true"
+        - name: ALERTMANAGER
+          value: "false"
+        - name: PUSHGATEWAY
+          value: "false"
+        - name: TIMEZONE
+          value: "UTC"
+        - name: PROMETHEUS_OPT
+          value: "--storage.tsdb.retention.time=60d --storage.tsdb.wal-compression"
+        ports:
+        - containerPort: 9090
+          name: prometheus
+          protocol: TCP
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "300m"
+          limits:
+            memory: "6Gi"
+            cpu: "600m"
+        volumeMounts:
+        - mountPath: /prometheus-rule
+          name: prometheus-rule
+        - mountPath: /etc/prometheus/prometheus.yml
+          name: prometheus-setting
+          subPath: prometheus.yml
+        - mountPath: /prometheus
+          name: prometheus-store
+          subPath: Prometheus
+      - image: chouhongming/prometheus
+        imagePullPolicy: Always
+        name: alertmanager
+        env:
+        - name: PROMETHEUS
+          value: "false"
+        - name: ALERTMANAGER
+          value: "true"
+        - name: PUSHGATEWAY
+          value: "false"
+        - name: TIMEZONE
+          value: "UTC"
+        - name: ALERTMANAGER_OPT
+          value: ""
+        ports:
+        - containerPort: 9093
+          name: alertmanager
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /etc/alertmanager/alertmanager.yml
+          name: prometheus-setting
+          subPath: alertmanager.yml
+        - mountPath: /alertmanager
+          name: prometheus-store
+          subPath: Alertmanager
+      - image: chouhongming/prometheus
+        imagePullPolicy: Always
+        name: pushgateway
+        env:
+        - name: PROMETHEUS
+          value: "false"
+        - name: ALERTMANAGER
+          value: "false"
+        - name: PUSHGATEWAY
+          value: "true"
+        - name: TIMEZONE
+          value: "UTC"
+        - name: PUSHGATEWAY_OPT
+          value: ""
+        ports:
+        - containerPort: 9091
+          name: pushgateway
+          protocol: TCP
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: prometheus-rule
+        configMap:
+          defaultMode: 420
+          name: prometheus-rule
+      - name: prometheus-setting
+        configMap:
+          defaultMode: 420
+          name: prometheus
+      - name: prometheus-store
+        persistentVolumeClaim:
+          claimName: prometheus
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/scrape: 'true'
+  name: prometheus
+  namespace: [YOUR_K8S_NAMESPACE]
+spec:
+  ports:
+  - name: prometheus
+    port: 9090
+    protocol: TCP
+    targetPort: 9090
+  - name: alertmanager
+    port: 9093
+    protocol: TCP
+    targetPort: 9093
+  - name: pushgateway
+    port: 9091
+    protocol: TCP
+    targetPort: 9091
+  selector:
+    app: prometheus
+  sessionAffinity: None
+  type: ClusterIP
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: prometheus-web
+  namespace: [YOUR_K8S_NAMESPACE]
+spec:
+  entryPoints:
+  - web
+  routes:
+  - kind: Rule
+    match: Host(`[YOUR_DOMAIN]`)
+    middlewares:
+    - name: [YOUR_K8S_REDIRECT-MIDDLEWARES]
+    services:
+    - name: prometheus
+      port: 9090
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: prometheus-websecure
+  namespace: [YOUR_K8S_NAMESPACE]
+spec:
+  entryPoints:
+  - websecure
+  routes:
+  - kind: Rule
+    match: Host(`[YOUR_DOMAIN]`)
+    services:
+    - name: prometheus
+      port: 9090
+  tls:
+    certResolver: [YOUR_K8S_RESOLVER_NAME]
+    options: {}
+
