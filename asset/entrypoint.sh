@@ -4,10 +4,10 @@
 test -z $PROMETHEUS && PROMETHEUS="true"
 test -z $ALERTMANAGER && ALERTMANAGER="true"
 test -z $PUSHGATEWAY && PUSHGATEWAY="true"
-test -z $TIMEZONE && TIMEZONE="UTC"
-test -z $PROMETHEUS_OPT || echo "Run Prometheus wiht option"$PROMETHEUS_OPT
-test -z $ALERTMANAGER_OPT || echo "Run AlertManager wiht option"$ALERTMANAGER_OPT
-test -z $PUSHGATEWAY_OPT || echo "Run PushGateway wiht option"$PUSHGATEWAY_OPT
+test -z "$TIMEZONE" && TIMEZONE="UTC"
+test -z "$PROMETHEUS_OPT" || echo "Run Prometheus wiht option"$PROMETHEUS_OPT
+test -z "$ALERTMANAGER_OPT" || echo "Run AlertManager wiht option"$ALERTMANAGER_OPT
+test -z "$PUSHGATEWAY_OPT" || echo "Run PushGateway wiht option"$PUSHGATEWAY_OPT
 
 
 if [ ! -f /etc/prometheus/prometheus.yml ]; then
