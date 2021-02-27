@@ -1,6 +1,6 @@
 version: "3.7"
 services:
-  server:
+  prometheus:
     image: chouhongming/prometheus
     ports:
       - "9090:9090/udp"

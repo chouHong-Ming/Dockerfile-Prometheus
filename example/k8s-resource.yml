@@ -8,7 +8,7 @@ spec:
   capacity:
     storage: 400Gi
   nfs:
-    path: /Prometheus/
+    path: [YOUR_NFS_PATH]
     server: [YOUR_NFS_SERVER]
   persistentVolumeReclaimPolicy: Retain
   volumeMode: Filesystem
@@ -222,7 +222,7 @@ data:
 
   alertmanager.yml: |
     global:
-      slack_api_url: ""
+      slack_api_url: "[YOUR_SLACK_URL]"
 
 
     route:
@@ -239,7 +239,7 @@ data:
     - name: Slack
       slack_configs:
       - send_resolved: true
-        channel: '[YOUR_K8S_CHANNEL]'
+        channel: '[YOUR_SLACK_CHANNEL]'
 
 kind: ConfigMap
 metadata:
