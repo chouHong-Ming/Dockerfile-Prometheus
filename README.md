@@ -1,5 +1,5 @@
 # Dockerfile-Prometheus
-The Image builds the Prometheus, AlertManager, and PushGateway service
+Use to build the image to run the Prometheus, AlertManager, and PushGateway service
 
 ## Description
 An container image for running Prometheus, AlertManager, and PushGateway and let you can run there three services in one container or more. So that you can manage your exporter more easily.
